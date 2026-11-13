@@ -45,7 +45,7 @@ jobs:
 
       - name: Installation des dépendances (${{ matrix.name }})
         working-directory: ${{ matrix.path }}
-        run: npm ci --prefer-offline
+        run: npm install --prefer-offline
 
       - name: Generate Prisma Client
         if: matrix.name == 'backend'
