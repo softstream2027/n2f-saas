@@ -24,7 +24,7 @@ jobs:
         include:
           - name: backend
             path: ./backend
-            setup_cmd: apt-get update && apt-get install -y openssl
+            setup_cmd: sudo apt-get update && sudo apt-get install -y openssl
           - name: frontend
             path: ./frontend
             setup_cmd: echo "Pas de prérequis système"
