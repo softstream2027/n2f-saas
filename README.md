@@ -199,7 +199,8 @@ Vous avez réussi à mettre en place une architecture **Cloud Native**, **évén
 
 🔑 Configuration des secrets sur GitHub
 
-Avant de pousser ce fichier, vous devez configurer les secrets dans votre dépôt GitHub. Allez dans Settings > Secrets and variables > Actions et ajoutez :
+Avant de pousser ce fichier, vous devez configurer les secrets dans votre dépôt GitHub.
+Allez dans Settings > Secrets and variables > Actions et ajoutez :
 
     DOCKERHUB_USERNAME : bassembenabbes
 
@@ -210,3 +211,4 @@ Avant de pousser ce fichier, vous devez configurer les secrets dans votre dépô
     NEXT_PUBLIC_STRIPE_PUBLIC_KEY
 
     NEXT_PUBLIC_AXELOR_URL
+    
