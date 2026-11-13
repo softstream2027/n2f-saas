@@ -1,0 +1,113 @@
+name: CI/CD - Build & Push Docker Images
+
+on:
+  push:
+    branches: [ main, develop, develop2 ]
+  pull_request:
+    branches: [ main, develop, develop2 ]
+
+env:
+  DOCKERHUB_USERNAME: bassembenabbes
+  BACKEND_IMAGE: bassembenabbes/softstream-saas-backend
+  FRONTEND_IMAGE: bassembenabbes/softstream-saas-frontend
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  # ==========================================
+  # JOB 1 : BUILD & TEST (Backend & Frontend en parallèle)
+  # ==========================================
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            path: ./backend
+            # Le backend a besoin d'openssl pour Prisma
+            setup_cmd: apt-get update && apt-get install -y openssl
+          - name: frontend
+            path: ./frontend
+            setup_cmd: echo "Pas de prérequis système"
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.name }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: ${{ matrix.path }}/package-lock.json
+
+      - name: Prérequis système (${{ matrix.name }})
+        run: ${{ matrix.setup_cmd }}
+
+      - name: Installation des dépendances (${{ matrix.name }})
+        working-directory: ${{ matrix.path }}
+        run: npm ci --prefer-offline
+
+      # Étape spécifique au Backend (Prisma & Build)
+      - name: Generate Prisma Client
+        if: matrix.name == 'backend'
+        working-directory: ${{ matrix.path }}
+        run: npx prisma generate
+
+      - name: Build (${{ matrix.name }})
+        working-directory: ${{ matrix.path }}
+        run: npm run build
+        env:
+          # Variables pour le build Next.js (Frontend)
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          NEXT_PUBLIC_STRIPE_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_PUBLIC_KEY }}
+          NEXT_PUBLIC_AXELOR_URL: ${{ secrets.NEXT_PUBLIC_AXELOR_URL }}
+
+  # ==========================================
+  # JOB 2 : DOCKER BUILD & PUSH (Backend & Frontend en parallèle)
+  # ==========================================
+  docker-build-push:
+    needs: build # Ne se lance que si le Job 1 (build) réussit
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            context: ./backend
+            image: bassembenabbes/softstream-saas-backend
+            build_args: |
+              BUILD_DATE=${{ github.event.head_commit.timestamp }}
+          - name: frontend
+            context: ./frontend
+            image: bassembenabbes/softstream-saas-frontend
+            build_args: |
+              NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
+              NEXT_PUBLIC_STRIPE_PUBLIC_KEY=${{ secrets.NEXT_PUBLIC_STRIPE_PUBLIC_KEY }}
+              NEXT_PUBLIC_AXELOR_URL=${{ secrets.NEXT_PUBLIC_AXELOR_URL }}
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and Push Docker Image (${{ matrix.name }})
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          build-args: ${{ matrix.build_args }}
+          tags: |
+            ${{ matrix.image }}:${{ env.IMAGE_TAG }}
+            ${{ matrix.image }}:latest
+          # Cache pour accélérer les builds Docker suivants
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -12,12 +12,7 @@ Flux : formulaire → paiement Stripe → validation webhook → création autom
   - `POST /api/webhooks/stripe` vérifie la signature Stripe et gère les événements `checkout.session.completed`, `invoice.payment_failed`, `customer.subscription.deleted`.
   - File `provisioning` : Partner → Company → User, reprise possible, 6 tentatives avec backoff.
   - Le mot de passe en clair n'est jamais stocké durablement ni envoyé par e-mail.
-<<<<<<< HEAD
 
-
-=======
- 
->>>>>>> develop2
 ## Mise en route
 1. `cp .env.example .env` et remplir les variables (clé : `openssl rand -base64 32`).
 2. **Stripe** : créer un compte Stripe, configurer les prix d'abonnement (`STRIPE_PRICE_STARTER`, `STRIPE_PRICE_BUSINESS`, `STRIPE_PRICE_PRODUCTION`) et le webhook `https://VOTRE-API/api/webhooks/stripe` avec les événements `checkout.session.completed`, `invoice.payment_failed`, `customer.subscription.deleted`.
@@ -202,3 +197,16 @@ Vous avez réussi à mettre en place une architecture **Cloud Native**, **évén
 
 
 
+🔑 Configuration des secrets sur GitHub
+
+Avant de pousser ce fichier, vous devez configurer les secrets dans votre dépôt GitHub. Allez dans Settings > Secrets and variables > Actions et ajoutez :
+
+    DOCKERHUB_USERNAME : bassembenabbes
+
+    DOCKERHUB_TOKEN : Votre token d'accès personnel Docker Hub (à créer dans les paramètres de votre compte Docker Hub, avec les droits Read & Write).
+
+    NEXT_PUBLIC_API_URL
+
+    NEXT_PUBLIC_STRIPE_PUBLIC_KEY
+
+    NEXT_PUBLIC_AXELOR_URL
