@@ -14,7 +14,7 @@ env:
 
 jobs:
   # ==========================================
-  # JOB 1 : BUILD & TEST (Backend & Frontend en parallèle)
+  # JOB 1 : BUILD & TEST
   # ==========================================
   build:
     runs-on: ubuntu-latest
@@ -24,7 +24,6 @@ jobs:
         include:
           - name: backend
             path: ./backend
-            # Le backend a besoin d'openssl pour Prisma
             setup_cmd: apt-get update && apt-get install -y openssl
           - name: frontend
             path: ./frontend
@@ -48,7 +47,6 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: npm ci --prefer-offline
 
-      # Étape spécifique au Backend (Prisma & Build)
       - name: Generate Prisma Client
         if: matrix.name == 'backend'
         working-directory: ${{ matrix.path }}
@@ -58,16 +56,15 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: npm run build
         env:
-          # Variables pour le build Next.js (Frontend)
           NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
           NEXT_PUBLIC_STRIPE_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_PUBLIC_KEY }}
           NEXT_PUBLIC_AXELOR_URL: ${{ secrets.NEXT_PUBLIC_AXELOR_URL }}
 
   # ==========================================
-  # JOB 2 : DOCKER BUILD & PUSH (Backend & Frontend en parallèle)
+  # JOB 2 : DOCKER BUILD & PUSH
   # ==========================================
   docker-build-push:
-    needs: build # Ne se lance que si le Job 1 (build) réussit
+    needs: build
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -76,15 +73,9 @@ jobs:
           - name: backend
             context: ./backend
             image: bassembenabbes/softstream-saas-backend
-            build_args: |
-              BUILD_DATE=${{ github.event.head_commit.timestamp }}
           - name: frontend
             context: ./frontend
             image: bassembenabbes/softstream-saas-frontend
-            build_args: |
-              NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
-              NEXT_PUBLIC_STRIPE_PUBLIC_KEY=${{ secrets.NEXT_PUBLIC_STRIPE_PUBLIC_KEY }}
-              NEXT_PUBLIC_AXELOR_URL=${{ secrets.NEXT_PUBLIC_AXELOR_URL }}
 
     steps:
       - name: Checkout du code
@@ -93,21 +84,26 @@ jobs:
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # 👇 Étape corrigée : on injecte les secrets ici, pas dans la matrix
       - name: Build and Push Docker Image (${{ matrix.name }})
         uses: docker/build-push-action@v5
         with:
           context: ${{ matrix.context }}
           push: true
-          build-args: ${{ matrix.build_args }}
+          # On passe toutes les variables. Docker ignorera celles qui ne sont pas dans le Dockerfile.
+          build-args: |
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
+            NEXT_PUBLIC_STRIPE_PUBLIC_KEY=${{ secrets.NEXT_PUBLIC_STRIPE_PUBLIC_KEY }}
+            NEXT_PUBLIC_AXELOR_URL=${{ secrets.NEXT_PUBLIC_AXELOR_URL }}
           tags: |
             ${{ matrix.image }}:${{ env.IMAGE_TAG }}
             ${{ matrix.image }}:latest
-          # Cache pour accélérer les builds Docker suivants
           cache-from: type=gha
           cache-to: type=gha,mode=max
