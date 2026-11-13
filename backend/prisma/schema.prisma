@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  PENDING_PAYMENT
+  PAID
+  PROVISIONING
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+  CANCELLED
+  FAILED
+}
+
+model Tenant {
+  id                   String       @id @default(cuid())
+  companyName          String
+  taxId                String
+  country              String
+  currency             String
+  plan                 String
+  // L'e-mail n'est plus unique : un client dont l'abonnement est annulé ou échoué peut se réinscrire.
+  // L'unicité utile est contrôlée dans TenantsService (statuts actifs) ; le login reste unique (il est global dans Axelor).
+  email                String
+  login                String       @unique
+  status               TenantStatus @default(PENDING_PAYMENT)
+
+  stripeCustomerId     String?      @unique
+  stripeSubscriptionId String?      @unique
+
+  // Code de société généré UNE fois (inclut une partie de l'id du tenant => jamais partagé entre deux clients)
+  companyCode          String?      @unique
+  axelorPartnerId      Int?
+  axelorCompanyId      Int?
+  axelorUserId         Int?
+  axelorSequenceId     Int?
+  axelorHrConfigId     Int?
+  axelorUserPartnerId  Int?
+  axelorEmployeeId     Int?
+
+  // Fin de la période payée (accès conservé jusqu'à cette date après une résiliation)
+  currentPeriodEnd     DateTime?
+  provisionedAt        DateTime?
+  lastError            String?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  simpleUser Boolean @default(false)
+
+  @@index([email])
+  @@index([status, createdAt])
+}
+
+model WebhookEvent {
+  id         String   @id
+  type       String
+  receivedAt DateTime @default(now())
+}
+
+model ProvisioningJob {
+  id          String    @id @default(cuid())
+  tenantId    String
+  status      String    @default("QUEUED")   // QUEUED | RETRY | DONE | FAILED
+  attempts    Int       @default(0)
+  lastError   String?
+  payload     Json
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
+
+  @@index([tenantId])
+}

@@ -1,0 +1,129 @@
+stages:
+  - build
+  - docker
+
+############################################
+# GLOBAL VARIABLES
+############################################
+variables:
+  # Configuration Docker
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: ""
+  DOCKER_BUILDKIT: "1"
+  
+  # Noms des images sur Docker Hub
+  BACKEND_IMAGE: "bassembenabbes/softstream-saas-backend"
+  FRONTEND_IMAGE: "bassembenabbes/softstream-saas-frontend"
+  IMAGE_TAG: "${CI_COMMIT_SHORT_SHA}"
+  IMAGE_LATEST: "latest"
+
+############################################
+# STAGE 1 : BUILD (Vérification du code)
+############################################
+build-backend:
+  stage: build
+  image: node:22-slim
+  cache:
+    key: npm-backend
+    paths:
+      - backend/.npm/
+      - backend/node_modules/
+  script:
+    - cd backend
+    - apt-get update && apt-get install -y openssl
+    - npm install --cache .npm --prefer-offline
+    - npx prisma generate
+    - npm run build
+  only:
+    - main
+    - develop
+    - develop2
+    - merge_requests
+
+build-frontend:
+  stage: build
+  image: node:22-slim
+  cache:
+    key: npm-frontend
+    paths:
+      - frontend/.npm/
+      - frontend/node_modules/
+  script:
+    - cd frontend
+    - npm install --cache .npm --prefer-offline
+    # Le build Next.js nécessite les variables publiques
+    - npm run build
+  variables:
+    # Ces variables doivent être définies dans GitLab > Settings > CI/CD > Variables
+    NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    NEXT_PUBLIC_STRIPE_PUBLIC_KEY: ${NEXT_PUBLIC_STRIPE_PUBLIC_KEY}
+    NEXT_PUBLIC_AXELOR_URL: ${NEXT_PUBLIC_AXELOR_URL}
+  only:
+    - main
+    - develop
+    - develop2
+    - merge_requests
+
+############################################
+# STAGE 2 : DOCKER BUILD & PUSH
+############################################
+docker-build-push-backend:
+  stage: docker
+  image: docker:27.1.1
+  services:
+    - name: docker:27.1.1-dind
+      command: ["--tls=false"]
+  cache: {}
+  before_script:
+    - echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+  script:
+    - cd backend
+    # Build de l'image Backend
+    - |
+      docker build \
+        --pull \
+        --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        -t ${BACKEND_IMAGE}:${IMAGE_TAG} \
+        -t ${BACKEND_IMAGE}:${IMAGE_LATEST} \
+        .
+    # Push des images
+    - docker push ${BACKEND_IMAGE}:${IMAGE_TAG}
+    - docker push ${BACKEND_IMAGE}:${IMAGE_LATEST}
+  after_script:
+    - docker logout || true
+  only:
+    - main
+    - develop
+    - develop2
+
+docker-build-push-frontend:
+  stage: docker
+  image: docker:27.1.1
+  services:
+    - name: docker:27.1.1-dind
+      command: ["--tls=false"]
+  cache: {}
+  before_script:
+    - echo "$DOCKERHUB_PASSWORD" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+  script:
+    - cd frontend
+    # Build de l'image Frontend avec passage des variables d'environnement Next.js
+    - |
+      docker build \
+        --pull \
+        --build-arg NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL}" \
+        --build-arg NEXT_PUBLIC_STRIPE_PUBLIC_KEY="${NEXT_PUBLIC_STRIPE_PUBLIC_KEY}" \
+        --build-arg NEXT_PUBLIC_AXELOR_URL="${NEXT_PUBLIC_AXELOR_URL}" \
+        -t ${FRONTEND_IMAGE}:${IMAGE_TAG} \
+        -t ${FRONTEND_IMAGE}:${IMAGE_LATEST} \
+        .
+    # Push des images
+    - docker push ${FRONTEND_IMAGE}:${IMAGE_TAG}
+    - docker push ${FRONTEND_IMAGE}:${IMAGE_LATEST}
+  after_script:
+    - docker logout || true
+  only:
+    - main
+    - develop
+    - develop2

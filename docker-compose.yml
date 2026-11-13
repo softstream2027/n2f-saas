@@ -1,0 +1,49 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sbsoft2026
+      POSTGRES_USER: sbsoft2026
+      POSTGRES_PASSWORD: sbsoft2026
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sbsoft2026 -d sbsoft2026"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: [redis_data:/data]
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_started }
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql://sbsoft2026:sbsoft2026@db:5432/sbsoft2026?schema=public
+      REDIS_URL: redis://redis:6379
+    ports: ["4000:4000"]
+        # 👇 AJOUTEZ CES DEUX LIGNES 👇
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_AXELOR_URL: ${NEXT_PUBLIC_AXELOR_URL}
+    restart: unless-stopped
+    depends_on: [backend]
+    ports: ["3000:3000"]
+
+volumes:
+  postgres_data:
+  redis_data:
