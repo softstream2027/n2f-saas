@@ -85,6 +85,7 @@ export default function HomePage() {
           <nav className="nav" aria-label="Navigation principale">
             <a href="#fonctionnalites">Fonctionnalités</a>
             <a href="#comparatif">Comparatif</a>
+            <a href="#application-mobile">Application mobile</a>
             <a href="#tarifs">Tarifs</a>
             <a href="#questions">Questions</a>
           </nav>
@@ -103,7 +104,7 @@ export default function HomePage() {
             </p>
             <div className="hero-actions">
               <a className="btn btn-primary" href="#inscription">Essai gratuit</a>
-              <a href="#application-mobile">Application mobile</a>
+              
               <a className="btn btn-ghost" href="#tarifs">Voir les tarifs</a>
             </div>
             <div className="trust-row" aria-label="Preuves sociales">
@@ -265,8 +266,7 @@ export default function HomePage() {
       <li>Ouvrez le fichier téléchargé sur votre smartphone Android.</li>
       <li>Si Android le demande, autorisez l’installation depuis cette source.</li>
       <li>Lancez l’application et connectez-vous avec votre compte.</li>
-    </ol>
-    <p className="fineprint">Android uniquement. Empreinte SHA-256 : <code>COLLE_ICI_LE_HASH</code></p>
+    </ol> 
   </div>
 </section>
 
