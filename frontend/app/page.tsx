@@ -103,6 +103,7 @@ export default function HomePage() {
             </p>
             <div className="hero-actions">
               <a className="btn btn-primary" href="#inscription">Essai gratuit</a>
+              <a href="#application-mobile">Application mobile</a>
               <a className="btn btn-ghost" href="#tarifs">Voir les tarifs</a>
             </div>
             <div className="trust-row" aria-label="Preuves sociales">
@@ -250,6 +251,25 @@ export default function HomePage() {
             ))}
           </div>
         </section>
+
+        <section id="application-mobile" className="section wrap">
+  <div className="section-head">
+    <h2>Application mobile Android</h2>
+    <p>Saisissez vos notes de frais depuis votre smartphone.</p>
+  </div>
+  <div className="download-card">
+    <a className="btn btn-primary" href="/downloads/app-n2f.apk" download="app-n2f.apk">
+      Télécharger l’application (.apk)
+    </a>
+    <ol className="check-list">
+      <li>Ouvrez le fichier téléchargé sur votre smartphone Android.</li>
+      <li>Si Android le demande, autorisez l’installation depuis cette source.</li>
+      <li>Lancez l’application et connectez-vous avec votre compte.</li>
+    </ol>
+    <p className="fineprint">Android uniquement. Empreinte SHA-256 : <code>COLLE_ICI_LE_HASH</code></p>
+  </div>
+</section>
+
       </main>
 
       <footer className="site-footer">
