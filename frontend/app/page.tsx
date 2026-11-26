@@ -266,7 +266,8 @@ export default function HomePage() {
       <li>Ouvrez le fichier téléchargé sur votre smartphone Android.</li>
       <li>Si Android le demande, autorisez l’installation depuis cette source.</li>
       <li>Lancez l’application et connectez-vous avec votre compte.</li>
-    </ol> 
+    </ol>
+     
   </div>
 </section>
 
