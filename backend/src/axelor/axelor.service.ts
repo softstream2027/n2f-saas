@@ -19,9 +19,10 @@ const M = {
   emailAddress: "com.axelor.message.db.EmailAddress",
   accountConfig: "com.axelor.apps.account.db.AccountConfig",
   account: "com.axelor.apps.account.db.Account",
+  product: "com.axelor.apps.base.db.Product",
 };
 
-// Configuration comptable figée (valeurs relevées dans l'interface Axelor)
+// Configuration comptable figée (valeurs relevées dans l'interface N2F)
 const ACCOUNTING_IMPORT_ACTION = "action-account-config-group-import-account-config";
 const ACCOUNTING_TEMPLATE_ID = 1; // « France - Plan Comptable Général »
 const ACCOUNTING_TEMPLATE_FIELD = "accountingConfigTemplate";
@@ -44,7 +45,7 @@ export class AxelorService {
   });
 
   // Authentification Basic "directe" (sans session ni CSRF).
-  // Nécessite côté Axelor : auth.local.basic-auth = indirect, direct
+  // Nécessite côté N2F : auth.local.basic-auth = indirect, direct
   private async call(method: "GET" | "POST" | "PUT", url: string, data?: Json): Promise<Json[]> {
     const res = await this.http.request({
       method,
@@ -56,7 +57,7 @@ export class AxelorService {
 
     if (res.status >= 400 || res.data?.status !== 0) {
       const detail = res.data?.data?.message ?? res.data?.data?.title ?? "";
-      throw new Error(`Axelor ${method} ${url} : HTTP ${res.status} ${String(detail).slice(0, 300)}`);
+      throw new Error(`N2F ${method} ${url} : HTTP ${res.status} ${String(detail).slice(0, 300)}`);
     }
     return res.data.data ?? [];
   }
@@ -87,7 +88,7 @@ export class AxelorService {
   private async create(model: string, data: Json): Promise<number> {
     const rows = await this.call("PUT", `/ws/rest/${model}`, { data });
     const id = rows[0]?.id;
-    if (!id) throw new Error(`Création Axelor échouée pour ${model}`);
+    if (!id) throw new Error(`Création N2F échouée pour ${model}`);
     this.log.log(`${model} créé (id=${id})`);
     return id;
   }
@@ -162,7 +163,7 @@ export class AxelorService {
 
   async printingSettingsId(name: string) {
     const id = await this.findId(M.printingSettings, "name", name);
-    if (!id) throw new Error(`Paramètres d'impression "${name}" introuvables dans Axelor`);
+    if (!id) throw new Error(`Paramètres d'impression "${name}" introuvables dans N2F`);
     return id;
   }
 
@@ -195,19 +196,21 @@ export class AxelorService {
   }
 
   createHrConfig(input: {
-    companyId: number;
-    sequenceId: number;
-    expenseReportTemplateId?: number;
-    annualReportTemplateId?: number;
-  }) {
-    const data: Json = {
-      company: { id: input.companyId },
-      expenseSequence: { id: input.sequenceId },
-    };
-    if (input.expenseReportTemplateId) data.expenseReportPrintTemplate = { id: input.expenseReportTemplateId };
-    if (input.annualReportTemplateId) data.employeeAnnualReportPrintTemplate = { id: input.annualReportTemplateId };
-    return this.create(M.hrConfig, data);
-  }
+  companyId: number;
+  sequenceId: number;
+  expenseReportTemplateId?: number;
+  annualReportTemplateId?: number;
+  kilometricExpenseProduct?: number;
+}) {
+  const data: Json = {
+    company: { id: input.companyId },
+    expenseSequence: { id: input.sequenceId },
+  };
+  if (input.expenseReportTemplateId) data.expenseReportPrintTemplate = { id: input.expenseReportTemplateId };
+  if (input.annualReportTemplateId) data.employeeAnnualReportPrintTemplate = { id: input.annualReportTemplateId };
+  if (input.kilometricExpenseProduct) data.kilometricExpenseProduct = { id: input.kilometricExpenseProduct };
+  return this.create(M.hrConfig, data);
+}
 
   createUserPartner(input: { name: string; emailAddressId: number; companyId?: number }) {
     const data: Json = {
@@ -242,7 +245,7 @@ export class AxelorService {
     return id !== null;
   }
 
-  /** Exécute une action serveur Axelor (bouton de formulaire). /ws/action répond 200 même en cas d'erreur métier. */
+  /** Exécute une action serveur N2F (bouton de formulaire). /ws/action répond 200 même en cas d'erreur métier. */
   private async runAction(model: string, action: string, context: Json): Promise<Json[]> {
     const res = await this.http.request({
       method: "POST",
@@ -254,17 +257,17 @@ export class AxelorService {
     });
     if (res.status >= 400 || res.data?.status !== 0) {
       const detail = res.data?.data?.message ?? res.data?.data?.title ?? "";
-      throw new Error(`Axelor action ${action} : HTTP ${res.status} ${String(detail).slice(0, 300)}`);
+      throw new Error(`N2F action ${action} : HTTP ${res.status} ${String(detail).slice(0, 300)}`);
     }
     const items: Json[] = Array.isArray(res.data?.data) ? res.data.data : [];
     for (const item of items) {
       if (item?.error) {
         const e = item.error;
         const msg = typeof e === "string" ? e : (e.message ?? e.title ?? JSON.stringify(e));
-        throw new Error(`Axelor action ${action} : ${String(msg).slice(0, 400)}`);
+        throw new Error(`N2F action ${action} : ${String(msg).slice(0, 400)}`);
       }
       if (item?.alert) {
-        throw new Error(`Axelor action ${action} demande une confirmation : ${String(item.alert).slice(0, 300)}`);
+        throw new Error(`N2F action ${action} demande une confirmation : ${String(item.alert).slice(0, 300)}`);
       }
     }
     return items;
@@ -363,13 +366,19 @@ export class AxelorService {
 
   async currencyId(codeISO: string) {
     const id = await this.findId(M.currency, "codeISO", codeISO);
-    if (!id) throw new Error(`Devise ${codeISO} introuvable dans Axelor`);
+    if (!id) throw new Error(`Devise ${codeISO} introuvable dans N2F`);
     return id;
   }
 
+  async productId(code: string) {
+  const id = await this.findId(M.product, "code", code);
+  if (!id) throw new Error(`Produit N2F "${code}" introuvable`);
+  return id;
+}
+
   async groupId(code: string) {
     const id = await this.findId(M.group, "code", code);
-    if (!id) throw new Error(`Groupe Axelor "${code}" introuvable`);
+    if (!id) throw new Error(`Groupe N2F "${code}" introuvable`);
     return id;
   }
 
@@ -391,7 +400,7 @@ export class AxelorService {
 
   async updatePartnerCompanySet(partnerId: number, companyId: number) {
     const [current] = await this.call("GET", `/ws/rest/${M.partner}/${partnerId}`);
-    if (!current) throw new Error(`Tiers Axelor ${partnerId} introuvable`);
+    if (!current) throw new Error(`Tiers N2F ${partnerId} introuvable`);
     const companySet = Array.isArray(current.companySet)
       ? current.companySet.map((item: any) => ({ id: item?.id }))
       : [];
@@ -465,7 +474,7 @@ export class AxelorService {
     ]);
   }
 
-  // Création de l'utilisateur SANS e-mail Axelor : le modèle d'e-mail d'Axelor relit transientPassword
+  // Création de l'utilisateur SANS e-mail N2F : le modèle d'e-mail d'N2F relit transientPassword
   // depuis la base (champ jamais enregistré) et ne peut donc pas contenir le mot de passe.
   // L'e-mail d'accès est envoyé par le backend (MailService) avec plainPassword.
   async createUser(input: {
@@ -499,7 +508,7 @@ export class AxelorService {
       expiresOn: input.expiresOn,
       password: hashedPassword,
       transientPassword: plainPassword,
-      sendEmailUponPasswordChange: false, // aucun e-mail Axelor : envoi par le backend
+      sendEmailUponPasswordChange: false, // aucun e-mail N2F : envoi par le backend
       change: true,
       forcePasswordChange: true,
     };
@@ -513,7 +522,7 @@ export class AxelorService {
 
     const rows = await this.call("PUT", `/ws/rest/${M.user}`, { data });
     const userId = rows[0]?.id;
-    if (!userId) throw new Error(`Création Axelor échouée pour ${M.user}`);
+    if (!userId) throw new Error(`Création N2F échouée pour ${M.user}`);
 
     this.log.log(`${M.user} créé (id=${userId})`);
     return { userId, plainPassword };
@@ -522,7 +531,7 @@ export class AxelorService {
   // Lier l'employé à l'utilisateur après création
   async setUserEmployee(userId: number, employeeId: number) {
     const [current] = await this.call("GET", `/ws/rest/${M.user}/${userId}`);
-    if (!current) throw new Error(`Utilisateur Axelor ${userId} introuvable`);
+    if (!current) throw new Error(`Utilisateur N2F ${userId} introuvable`);
     await this.call("POST", `/ws/rest/${M.user}/${userId}`, {
       data: { id: userId, version: current.version, employee: { id: employeeId } },
     });
@@ -530,7 +539,7 @@ export class AxelorService {
 
   async setUserAccess(userId: number, patch: { blocked?: boolean; expiresOn?: string }) {
     const [current] = await this.call("GET", `/ws/rest/${M.user}/${userId}`);
-    if (!current) throw new Error(`Utilisateur Axelor ${userId} introuvable`);
+    if (!current) throw new Error(`Utilisateur N2F ${userId} introuvable`);
     const data: Json = { id: userId, version: current.version };
     if (patch.blocked !== undefined) data.blocked = patch.blocked;
     if (patch.expiresOn !== undefined) data.expiresOn = patch.expiresOn;

@@ -232,6 +232,12 @@ export class ProvisioningProcessor extends WorkerHost {
         const annualReportTemplateId =
           this.numberEnv("HR_ANNUAL_REPORT_TEMPLATE_ID") ?? (await this.axelor.printingSettingsId("EmployeeAnnualReport"));
 
+           // Produit « frais kilométriques » : id forcé par l'env, sinon recherche par code
+  const kilometricExpenseProduct =
+    this.numberEnv("HR_KILOMETRIC_PRODUCT_ID") ??
+    (await this.axelor.productId(this.config.get<string>("HR_KILOMETRIC_PRODUCT_CODE", "NDF-0004")));
+
+
         hrConfigId =
           (await this.axelor.findHrConfigId(companyId)) ??
           (await this.axelor.createHrConfig({
@@ -239,6 +245,7 @@ export class ProvisioningProcessor extends WorkerHost {
             sequenceId,
             expenseReportTemplateId,
             annualReportTemplateId,
+            kilometricExpenseProduct,
           }));
         await this.prisma.tenant.update({ where: { id: tenantId }, data: { axelorHrConfigId: hrConfigId } });
       }
